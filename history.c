@@ -2,13 +2,25 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+History hist_concat(const History *left, const History *right) {
+	char *str = malloc(sizeof(char) * (left->len + right->len - 1));
+	if (!str) return hist_init(NULL);
+	strcpy(str, left->val);
+	strcpy(str + left->len - 1, right->val);
+	History ans = hist_init(str);
+	free(str);
+	return ans;
+}
+
 History hist_init(const char *str) {
 	History ans;
 	char **val_tmp = (char **) &ans.val;
 	size_t *len_tmp = (size_t *) &ans.len;
-	if (str)
+	*val_tmp = NULL;
+	if (str) {
 		*len_tmp = 1 + strlen(str);
-	*val_tmp = str ? malloc(ans.len * sizeof(char)) : NULL;
+		*val_tmp = malloc(ans.len * sizeof(char));
+	}
 	if (ans.val)
 		strncpy(*val_tmp, str, ans.len);
 	return ans;

@@ -9,6 +9,7 @@ typedef struct History {
 	const char *const val;
 } History;
 
+History hist_concat(const History *, const History *);
 History hist_init(const char *);
 History hist_prefix(const History *, size_t);
 History hist_suffix(const History *, size_t);

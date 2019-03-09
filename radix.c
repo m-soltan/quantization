@@ -24,14 +24,13 @@ int node_init_fields(Node *x, const char *s) {
 }
 
 Node *tree_find(const Node *tree, const char *pattern) {
-	// dummy value for the first iteration
-	const Node *prev = tree;
-	while (tree && node_fit(tree, pattern)) {
-		prev = tree;
-		tree = tree->children[*pattern - '0'];
-		pattern += prev->val.len - 1;
+	for (const Node *next; ; tree = next) {
+		next = tree->children[*pattern - '0'];
+		if (!next || !node_fit(tree, pattern))
+			break;
+		pattern += tree->val.len - 1;
 	}
-	return (Node *) prev;
+	return (Node *) tree;
 }
 
 Node * tree_init(const char *s) {
@@ -48,9 +47,9 @@ Node * tree_init(const char *s) {
 }
 
 void tree_attach(Node *parent, Node *child) {
-	int position = child->val->val[0] - '0';
+	int position = child->val.val[0] - '0';
 	size_t *depth_tmp = (size_t *) &child->depth;
-	*depth_tmp = parent->depth + parent->val->len - 1;
+	*depth_tmp = parent->depth + parent->val.len - 1;
 	if (!parent->children[position])
 		parent->children[position] = child;
 }
