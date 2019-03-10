@@ -1,34 +1,41 @@
 #include "radix.h"
 
-/* the size of the alphabet - the digits 0, 1, 2, 3 (4) plus 1 for the 5th
+/*
+ * the size of the alphabet - the 4 digits 0, 1, 2, 3 plus 1 for the 5th
  * place, reserved for a marker
  */
 #define DEGREE 5
 
+struct Node {
+	History his;
+	size_t depth;
+	struct Node **children;
+};
+
 int node_fit(const Node *x, const char *pattern) {
-	return (!strncmp(x->val.val, pattern, x->val.len - 1));
+	return (!strncmp(x->his.val, pattern, x->his.len - 1));
 }
 
 int node_init_fields(Node *x, const char *s) {
-	Node ***children_tmp = (Node ***) &x->children;
-	*children_tmp = (Node **) malloc(DEGREE * sizeof(Node *));
-	if (*children_tmp) {
-		History h = hist_init(s);
-		size_t *len_tmp = (size_t *) &x->val.len;
-		const char **val_tmp = (const char **) &x->val.val;
-		*len_tmp = h.len;
-		*val_tmp = h.val;
+	x->children = (Node **) malloc(DEGREE * sizeof(Node *));
+	if (x->children) {
+		x->depth = 0;
+		hist_init(&x->his, s);
 		return 0;
 	}
 	return 1;
 }
 
-Node *tree_find(const Node *tree, const char *pattern) {
-	for (const Node *next; ; tree = next) {
-		next = tree->children[*pattern - '0'];
-		if (!next || !node_fit(tree, pattern))
-			break;
-		pattern += tree->val.len - 1;
+Node * get_child(const Node *parent, const char *pattern) {
+	assert(pattern[0] >= '0' && pattern[0] < '4');
+	return parent->children[pattern[0] - '0'];
+}
+
+Node * tree_find(const Node *tree, const char *pattern) {
+	const Node *next = get_child(tree, pattern);
+	for (; next && node_fit(tree, pattern); next = get_child(tree, pattern)) {
+		pattern += tree->his.len - 1;
+		tree = next;
 	}
 	return (Node *) tree;
 }
@@ -46,11 +53,26 @@ Node * tree_init(const char *s) {
 	return NULL;
 }
 
+void tree_insert(Node *tree, const char *str) {
+	Node *parent = tree_find(tree, str);
+	Node *child = tree_init(str + parent->depth + parent->his.len - 1);
+	tree_attach(parent, child);
+}
+
+void node_split(Node *x, size_t prefix_size) {
+	History old = x->his;
+	Node *added_child = tree_init(NULL);
+	x->his = hist_prefix(&old, prefix_size);
+	added_child->his = hist_suffix(&old, old.len - prefix_size + 1);
+	Node **temp = x->children;
+	x->children = added_child->children;
+	added_child->children = temp;
+	tree_attach(x, added_child);
+}
+
 void tree_attach(Node *parent, Node *child) {
-	int position = child->val.val[0] - '0';
-	size_t *depth_tmp = (size_t *) &child->depth;
-	*depth_tmp = parent->depth + parent->val.len - 1;
+	int position = child->his.val[0] - '0';
+	child->depth = parent->depth + parent->his.len - 1;
 	if (!parent->children[position])
 		parent->children[position] = child;
 }
-
