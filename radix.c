@@ -40,10 +40,10 @@ Node * tree_find(const Node *tree, const char *pattern) {
 	return (Node *) tree;
 }
 
-Node * tree_init(const char *s) {
+Node * tree_init(const char *str) {
 	Node *ans = (Node *) malloc(sizeof(Node));
 	if (ans) {
-		if (!node_init_fields(ans, s)) {
+		if (!node_init_fields(ans, str)) {
 			for (size_t i = 0; i < DEGREE; ++i)
 				ans->children[i] = NULL;
 			return ans;
@@ -53,9 +53,17 @@ Node * tree_init(const char *s) {
 	return NULL;
 }
 
+// todo: untested
 void tree_insert(Node *tree, const char *str) {
-	Node *parent = tree_find(tree, str);
-	Node *child = tree_init(str + parent->depth + parent->his.len - 1);
+	tree = tree_find(tree, str);
+	Node *parent = tree;
+	str += tree->depth + tree->his.len - 1;
+	if (get_child(tree, str)) {
+		node_split(tree, first_difference(&tree->his, str));
+		parent = tree->children[*str];
+		str += tree->his.len - 1;
+	}
+	Node *child = tree_init(str);
 	tree_attach(parent, child);
 }
 
@@ -73,6 +81,8 @@ void node_split(Node *x, size_t prefix_size) {
 void tree_attach(Node *parent, Node *child) {
 	int position = child->his.val[0] - '0';
 	child->depth = parent->depth + parent->his.len - 1;
-	if (!parent->children[position])
+	if (!parent->children[position]) {
 		parent->children[position] = child;
+		return;
+	}
 }
