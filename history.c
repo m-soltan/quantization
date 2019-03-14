@@ -61,6 +61,6 @@ size_t first_difference(const History *h, const char *str) {
 	return max_ans;
 }
 
-void hist_destroy(History x) {
-	free(x.val);
+void hist_destroy(History *x) {
+	free(x->val);
 }

@@ -15,7 +15,7 @@ History hist_prefix(const History *, size_t);
 History hist_suffix(const History *, size_t);
 size_t first_difference(const History *, const char *);
 
-void hist_destroy(History);
+void hist_destroy(History *);
 void hist_init(History *, const char *);
 
 #endif //QUANTIZATION_HISTORY_H
