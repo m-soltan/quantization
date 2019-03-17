@@ -24,6 +24,18 @@ struct Node {
 	Node **children;
 };
 
+// auxiliary functions
+
+int node_init_fields(Node *x, const char *s) {
+	x->children = (Node **) calloc(DEGREE, sizeof(Node *));
+	if (x->children) {
+		x->depth = 0;
+		hist_init(&x->his, s);
+		return 0;
+	}
+	return 1;
+}
+
 List * list_init() {
 	List *ans = (List *) malloc(sizeof(List));
 	if (ans) {
@@ -31,6 +43,16 @@ List * list_init() {
 		ans->val = NULL;
 	}
 	return ans;
+}
+
+Node * node_init(const char *str) {
+	Node *ans = (Node *) malloc(sizeof(Node));
+	if (ans) {
+		if (!node_init_fields(ans, str))
+			return ans;
+		free(ans);
+	}
+	return NULL;
 }
 
 Node ** list_pop(List **x) {
@@ -61,72 +83,8 @@ void node_destroy(Node **x, List **l) {
 	*x = NULL;
 }
 
-//
-
 int node_fit(const Node *x, const char *pattern) {
 	return (!strncmp(x->his.val, pattern, x->his.len - 1));
-}
-
-int node_init_fields(Node *x, const char *s) {
-	x->children = (Node **) malloc(DEGREE * sizeof(Node *));
-	if (x->children) {
-		x->depth = 0;
-		hist_init(&x->his, s);
-		return 0;
-	}
-	return 1;
-}
-
-Node * get_child(const Node *parent, const char *pattern) {
-	get_child_ref(parent, pattern);
-	return parent->children[pattern[0] - '0'];
-}
-
-Node ** get_child_ref(const Node *parent, const char *pattern) {
-	assert(pattern[0] >= '0' && pattern[0] < '4');
-	return &parent->children[pattern[0] - '0'];
-}
-
-Node * node_init(const char *str) {
-	Node *ans = (Node *) malloc(sizeof(Node));
-	if (ans) {
-		if (!node_init_fields(ans, str)) {
-			for (size_t i = 0; i < DEGREE; ++i)
-				ans->children[i] = NULL;
-			return ans;
-		}
-		free(ans);
-	}
-	return NULL;
-}
-// todo rewrite find_parent and define find using find_parent
-Node * tree_find(const Node *tree, const char *str) {
-	const Node *next = get_child(tree, str);
-	while (next && node_fit(next, str)) {
-		str += tree->his.len - 1;
-		if (str[0] == '\0')
-			break;
-		tree = next;
-		next = get_child(tree, str);
-	}
-	return (Node *) tree;
-}
-
-Node * tree_find_parent(const Node *tree, const char *str) {
-	const Node *next = get_child(tree, str), *previous = tree;
-	while (next && node_fit(next, str)) {
-		str += tree->his.len - 1;
-		if (str[0] == '\0')
-			break;
-		previous = tree;
-		tree = next;
-		next = get_child(tree, str);
-	}
-	return (Node *) previous;
-}
-
-Node * tree_init() {
-	return node_init("");
 }
 
 void node_absorb(Node *x, size_t child_num) {
@@ -141,23 +99,57 @@ void node_absorb(Node *x, size_t child_num) {
 	x->children = child->children;
 }
 
+// auxiliary function used to attach a child to a specified parent
+void node_attach(Node *parent, Node *child) {
+	int position = child->his.val[0] - '0';
+	child->depth = parent->depth + parent->his.len - 1;
+	if (!parent->children[position])
+		parent->children[position] = child;
+}
 
 void node_split(Node *x, size_t prefix_size) {
 	History old = x->his;
 	Node *added_child = node_init(NULL);
 	x->his = hist_prefix(&old, prefix_size);
 	added_child->his = hist_suffix(&old, old.len - prefix_size + 1);
+	hist_destroy(&old);
 	Node **temp = x->children;
 	x->children = added_child->children;
 	added_child->children = temp;
-	tree_attach(x, added_child);
+	node_attach(x, added_child);
 }
 
-void tree_attach(Node *parent, Node *child) {
-	int position = child->his.val[0] - '0';
-	child->depth = parent->depth + parent->his.len - 1;
-	if (!parent->children[position])
-		parent->children[position] = child;
+// linked functions
+
+Energy * get_energy(const Node *x) {
+	return x->energy;
+}
+
+Node ** get_child(const Node *parent, const char *pattern) {
+	assert(pattern[0] >= '0' && pattern[0] < '4');
+	return &parent->children[pattern[0] - '0'];
+}
+
+const Node * tree_find(const Node *tree, const char *str) {
+	const Node *next = *get_child(tree, str), *previous = tree;
+	while (next && node_fit(next, str)) {
+		str += tree->his.len - 1;
+		if (str[0] == '\0')
+			break;
+		previous = tree;
+		tree = next;
+		next = *get_child(tree, str);
+	}
+	return previous;
+}
+
+Node * tree_find_split(Node *tree, const char *str) {
+	Node *parent = (Node *) tree_find(tree, str);
+	
+}
+
+Node * tree_init() {
+	return node_init("");
 }
 
 void tree_destroy(Node **x) {
@@ -175,17 +167,17 @@ void tree_destroy_rec(Node **x) {
 	for (size_t i = 0; i < DEGREE; ++i) {
 		tree_destroy_rec((*x)->children + i);
 	}
+	free((*x)->children);
 	energy_destroy((*x)->energy);
-	fprintf(stdout, "%s\n", (*x)->his.val);
 	hist_destroy(&(*x)->his);
 	free(*x);
 	*x = NULL;
 }
 
 void tree_insert(Node *tree, const char *str) {
-	tree = tree_find_parent(tree, str);
+	tree = (Node *) tree_find(tree, str);
 	str += tree->depth + tree->his.len - 1;
-	Node *old_child = get_child(tree, str), *parent = tree;
+	Node *old_child = *get_child(tree, str), *parent = tree;
 	if (old_child) {
 		node_split(old_child, 1 + first_difference(&old_child->his, str));
 		parent = old_child;
@@ -194,20 +186,20 @@ void tree_insert(Node *tree, const char *str) {
 		str += tree->his.len - 1;
 	}
 	Node *new_child = node_init(str);
-	tree_attach(parent, new_child);
+	node_attach(parent, new_child);
 }
 
 void tree_remove(Node *tree, const char *str) {
 	tree_insert(tree, str);
-	Node **child, *parent = tree_find_parent(tree, str);
+	Node **child, *parent = (Node *) tree_find(tree, str);
 	str += parent->depth;
-	child = get_child_ref(parent, str);
+	child = get_child(parent, str);
 	if (node_fit(*child, str))
 		return tree_destroy(child);
 	assert(0);
 }
 
-// debug function definitions
+// debug functions
 
 int debug_single_child(const Node *x) {
 	int found_one = 0;
