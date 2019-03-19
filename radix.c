@@ -16,7 +16,6 @@ struct List {
 	Node **val;
 };
 
-// todo: add energy pointer
 struct Node {
 	size_t depth;
 	History his;
@@ -144,8 +143,16 @@ const Node * tree_find(const Node *tree, const char *str) {
 }
 
 Node * tree_find_split(Node *tree, const char *str) {
-	Node *parent = (Node *) tree_find(tree, str);
-	
+	Node *child, *parent = (Node *) tree_find(tree, str);
+	str += parent->depth;
+	size_t len = strlen(str);
+	child = *get_child(parent, str);
+	if (strncmp(child->his.val, str, child->his.len - 1) != 0)
+		return NULL;
+	if (child->his.len == len)
+		return child;
+	node_split(child, 1 + len);
+	return child;
 }
 
 Node * tree_init() {
