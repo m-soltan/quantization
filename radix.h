@@ -16,8 +16,10 @@ Energy * get_energy(const Node *);
  * tree_find returns a pointer to N's parent
  */
 const Node * tree_find(const Node *, const char *);
+const Node * tree_find_exact(const Node *, const char *);
 Node * tree_find_split(Node *, const char *);
 Node * tree_init();
+void add_energy(Node *, energy_t);
 void tree_destroy(Node **);
 void tree_destroy_rec(Node **);
 void tree_insert(Node *, const char *);

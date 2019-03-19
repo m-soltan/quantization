@@ -142,6 +142,15 @@ const Node * tree_find(const Node *tree, const char *str) {
 	return previous;
 }
 
+const Node * tree_find_exact(const Node *tree, const char *str) {
+	const Node * parent = tree_find(tree, str);
+	str += parent->depth;
+	const Node * child = *get_child(parent, str);
+	if (child && child->his.val == str)
+		return child;
+	return NULL;
+}
+
 Node * tree_find_split(Node *tree, const char *str) {
 	Node *child, *parent = (Node *) tree_find(tree, str);
 	str += parent->depth;
@@ -157,6 +166,10 @@ Node * tree_find_split(Node *tree, const char *str) {
 
 Node * tree_init() {
 	return node_init("");
+}
+
+void add_energy(Node *x, energy_t e) {
+	x->energy = make_set(e);
 }
 
 void tree_destroy(Node **x) {
