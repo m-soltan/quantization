@@ -86,17 +86,17 @@ int node_fit(const Node *x, const char *pattern) {
 	return (!strncmp(x->his.val, pattern, x->his.len - 1));
 }
 
-void node_absorb(Node *x, size_t child_num) {
-	assert(debug_single_child(x));
-	assert(child_num < DEGREE);
-	Node *child = x->children[child_num];
-	History temp = hist_concat(&x->his, &child->his);
-	hist_destroy(&x->his);
-	hist_destroy(&child->his);
-	x->his = temp;
-	free(x->children);
-	x->children = child->children;
-}
+//void node_absorb(Node *x, size_t child_num) {
+//	assert(debug_single_child(x));
+//	assert(child_num < DEGREE);
+//	Node *child = x->children[child_num];
+//	History temp = hist_concat(&x->his, &child->his);
+//	hist_destroy(&x->his);
+//	hist_destroy(&child->his);
+//	x->his = temp;
+//	free(x->children);
+//	x->children = child->children;
+//}
 
 // auxiliary function used to attach a child to a specified parent
 void node_attach(Node *parent, Node *child) {
@@ -144,9 +144,10 @@ const Node * tree_find(const Node *tree, const char *str) {
 
 const Node * tree_find_exact(const Node *tree, const char *str) {
 	const Node * parent = tree_find(tree, str);
-	str += parent->depth;
-	const Node * child = *get_child(parent, str);
-	if (child && child->his.val == str)
+	str += parent->depth + parent->his.len - 1;
+	size_t len = strlen(str);
+	const Node *child = *get_child(parent, str);
+	if (child && !strncmp(child->his.val, str, len))
 		return child;
 	return NULL;
 }
@@ -156,7 +157,7 @@ Node * tree_find_split(Node *tree, const char *str) {
 	str += parent->depth;
 	size_t len = strlen(str);
 	child = *get_child(parent, str);
-	if (strncmp(child->his.val, str, child->his.len - 1) != 0)
+	if (!child || strncmp(child->his.val, str, child->his.len - 1) != 0)
 		return NULL;
 	if (child->his.len == len)
 		return child;
@@ -195,17 +196,23 @@ void tree_destroy_rec(Node **x) {
 }
 
 void tree_insert(Node *tree, const char *str) {
+	if (!strcmp(str, "01")) {
+	
+	}
+	Node *new_child, *old_child, *parent;
 	tree = (Node *) tree_find(tree, str);
 	str += tree->depth + tree->his.len - 1;
-	Node *old_child = *get_child(tree, str), *parent = tree;
+	old_child = *get_child(tree, str);
+	parent = tree;
 	if (old_child) {
+		if (!strncmp(str, old_child->his.val, strlen(str))) return;
 		node_split(old_child, 1 + first_difference(&old_child->his, str));
 		parent = old_child;
 		str += old_child->his.len - 1;
 	} else {
 		str += tree->his.len - 1;
 	}
-	Node *new_child = node_init(str);
+	new_child = node_init(str);
 	node_attach(parent, new_child);
 }
 
