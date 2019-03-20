@@ -222,7 +222,7 @@ void tree_remove(Node *tree, const char *str) {
 	str += parent->depth;
 	child = get_child(parent, str);
 	if (node_fit(*child, str))
-		return tree_destroy(child);
+		return tree_destroy_rec(child);
 	assert(0);
 }
 

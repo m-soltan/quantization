@@ -26,6 +26,7 @@ size_t command_size(Command);
 size_t energy_length(const char *);
 size_t history_size(const char *);
 size_t read_line();
+void init_if_one(Energy **, Energy **);
 void two_arg_energy(const char *, const char *);
 void two_arg_equal(const char *, const char *);
 void parse_line(const char *);
@@ -65,9 +66,9 @@ size_t command_size(Command c) {
 			return sizeof(CMD_VAL);
 		case (ERROR) : {
 			assert(0);
-			return 0;
 		}
 	}
+	return 0;
 }
 
 // 0 - error
@@ -142,6 +143,15 @@ void exec_two_arg(const char *str, Command c, size_t s1, size_t s2) {
 	}
 }
 
+void init_if_one(Energy **e1, Energy **e2) {
+	if (!e1 == !e2)
+		return;
+	if (e1 && !e2)
+		return init_if_one(e2, e1);
+//	e1 = make_set(0);
+// todo
+}
+
 void two_arg_energy(const char *arg1, const char *arg2) {
 	Node *t = tree_find_split(root, arg1);
 	if (!t) return;
@@ -163,7 +173,7 @@ void two_arg_equal(const char *arg1, const char *arg2) {
 	e1 = get_energy(t1);
 	e2 = get_energy(t2);
 	if (!e1 && !e2) return print_error();
-	// todo initialize energy if none
+	init_if_one(e1, e2);
 	set_union(e1, e2);
 }
 
