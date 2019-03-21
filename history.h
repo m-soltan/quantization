@@ -6,7 +6,7 @@
 #define QUANTIZATION_HISTORY_H
 
 typedef struct History {
-	size_t len;
+	size_t size;
 	char * val;
 } History;
 
