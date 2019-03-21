@@ -167,8 +167,8 @@ int two_arg_equal(const char *arg1, const char *arg2) {
 	t2 = tree_find_split(root, arg2);
 	if (!t1 || !t2)
 		return 1;
-	e1 = *get_energy(t1);
-	e2 = *get_energy(t2);
+	e1 = get_energy(t1);
+	e2 = get_energy(t2);
 	if (!e1 && !e2)
 		return 1;
 	init_if_one(&e1, &e2);
@@ -206,10 +206,14 @@ int exec_one_arg(const char *str, Command c, size_t s) {
 			Node *t = tree_find_exact(root, arg);
 			if (!t)
 				return 1;
-			energy_print(*get_energy(t));
+			energy_print(get_energy(t));
 			return 2;
 		}
 		case (REMOVE) : {
+			//todo
+			if (str[1] == ' ') {
+			
+			}
 			tree_remove(root, arg);
 			return 0;
 		}
@@ -246,7 +250,7 @@ void buffer_readjust() {
 }
 
 void print_error() {
-	fprintf(stdout, "ERROR\n");
+	fprintf(stderr, "ERROR\n");
 }
 
 void print_ok() {
