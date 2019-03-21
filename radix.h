@@ -7,16 +7,19 @@
 #ifndef QUANTIZATION_RADIX_H
 #define QUANTIZATION_RADIX_H
 
+typedef struct Node Node;
+
+Energy * get_energy(Node *);
 /*
  * let p - longest prefix of the string parameter that exists in the tree
  * N - the last node that contains some part of p
- * tree_find returns a pointer to N's parent
+ * find_parent returns a pointer to N's parent
  */
 Node * tree_find_exact(Node *tree, const char *str);
 Node * tree_find_split(Node *, const char *);
 Node * tree_init();
 void add_energy(Node *, energy_t);
-void tree_destroy(Node **);
+
 void tree_destroy_rec(Node **);
 void tree_insert(Node *, const char *);
 // removes the whole subtree under string parameter
