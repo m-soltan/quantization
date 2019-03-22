@@ -82,6 +82,11 @@ energy_t energy_convert(uint64_t x) {
 	return x;
 }
 
+energy_t energy_value(const Energy *x) {
+	assert(x);
+	return x->val;
+}
+
 Energy * energy_init(energy_t val) {
 	Energy *ans = (Energy *) malloc(sizeof(Energy));
 	if (ans) {
@@ -93,6 +98,25 @@ Energy * energy_init(energy_t val) {
 		ans->left = ans->right = ans;
 	}
 	return ans;
+}
+
+Energy * energy_mod(Energy *old, energy_t new_val) {
+	if (old) {
+		Energy *root = energy_find(old);
+		root->val = new_val;
+		return old;
+	} else {
+		return energy_init(new_val);
+	}
+}
+
+int energy_print(Energy *x) {
+	if (!x) {
+		return 1;
+	} else {
+		fprintf(stdout, "%llu\n", energy_find(x)->val);
+		return 0;
+	}
 }
 
 void energy_union(Energy *x, Energy *y) {
@@ -125,6 +149,3 @@ void energy_destroy(Energy *x) {
 	}
 }
 
-void energy_print(const Energy *x) {
-	if (x) fprintf(stdout, "%llu\n", x->val);
-}

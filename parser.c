@@ -29,7 +29,7 @@ size_t energy_length(const char *);
 size_t history_size(const char *);
 size_t read_line();
 size_t second_arg_size(Command c, const char *str);
-void init_if_one(Energy **, Energy **);
+void init_where_null(Energy **e1, Energy **e2);
 int two_arg_energy(const char *, const char *);
 int two_arg_equal(const char *, const char *);
 int parse_line(const char *);
@@ -136,17 +136,21 @@ int exec_two_arg(const char *str, Command c, size_t s1, size_t s2) {
 	}
 }
 
-void init_if_one(Energy **e1, Energy **e2) {
-	if ((*e1 && *e2) || (!*e1 && !*e2))
+void init_where_null(Energy **e1, Energy **e2) {
+	assert(*e1 || *e2);
+	if (*e1 && *e2)
 		return;
-	if (*e1 && !*e2)
-		init_if_one(e2, e1);
-	else
-		*e1 = energy_init(0);
+	if (*e1) {
+		*e1 = energy_find(*e1);
+		*e2 = energy_init(energy_value(*e1));
+	} else {
+		*e2 = energy_find(*e2);
+		*e1 = energy_init(energy_value(*e2));
+	}
 }
 
 int two_arg_energy(const char *arg1, const char *arg2) {
-	Node *t = tree_find_split(root, arg1);
+	Node *t = tree_find(root, arg1);
 	if (!t) return 1;
 	if (!strcmp(arg2, MAX_ENERGY)) {
 		add_energy(t, energy_convert(UINT64_MAX));
@@ -162,17 +166,18 @@ int two_arg_energy(const char *arg1, const char *arg2) {
 
 int two_arg_equal(const char *arg1, const char *arg2) {
 	Node *t1, *t2;
-	Energy *e1, *e2;
-	t1 = tree_find_split(root, arg1);
-	t2 = tree_find_split(root, arg2);
+	Energy **e1, **e2;
+	t1 = tree_find(root, arg1);
+	t2 = tree_find(root, arg2);
 	if (!t1 || !t2)
 		return 1;
 	e1 = get_energy(t1);
 	e2 = get_energy(t2);
-	if (!e1 && !e2)
+	assert(e1 && e2);
+	if (!*e1 && !*e2)
 		return 1;
-	init_if_one(&e1, &e2);
-	energy_union(e1, e2);
+	init_where_null(e1, e2);
+	energy_union(*e1, *e2);
 	return 0;
 }
 
@@ -203,22 +208,20 @@ int exec_one_arg(const char *str, Command c, size_t s) {
 			return 0;
 		}
 		case (ENERGY) : {
-			Node *t = tree_find_exact(root, arg);
-			if (!t)
+			Node *t = tree_find(root, arg);
+			if (!t || energy_print(*get_energy(t)))
 				return 1;
-			energy_print(get_energy(t));
 			return 2;
 		}
 		case (REMOVE) : {
-			//todo
-			if (str[1] == ' ') {
-			
+			if (strlen(arg) > 9){
+				//todo: remove debug statement
 			}
 			tree_remove(root, arg);
 			return 0;
 		}
 		case (VALID) : {
-			puts(tree_find_exact(root, arg) ? "YES" : "NO");
+			puts(tree_find(root, arg) ? "YES" : "NO");
 			return 2;
 		}
 		default:
