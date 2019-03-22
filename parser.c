@@ -11,7 +11,6 @@
 // maximum line length
 #define BASE_BUFFER_SIZE 140000
 
-//todo handle allocation errors in parser
 typedef enum Command Command;
 
 static size_t buffer_size = BASE_BUFFER_SIZE;
@@ -40,6 +39,7 @@ int two_arg_equal(const char *, const char *);
 int parse_line(const char *);
 int exec_one_arg(const char *str, Command c, size_t s);
 int buffer_enlarge();
+// switches back to the static buffer
 void buffer_readjust();
 void print_error();
 void print_ok();
@@ -55,15 +55,20 @@ void initialize() {
 	root = tree_init();
 }
 
-void read_input() {
+int read_input() {
 	for (;;) {
 		int parse_result;
 		size_t length = read_line();
 		if (length == 0)
-			return;
-		if ((length == 1) || (static_buffer[0] == '#'))
+			return 0;
+		if ((length == 1) || (buffer[0] == '#'))
 			continue;
-		parse_result = parse_line(static_buffer);
+		if (length == SIZE_MAX) {
+			tree_destroy(&root);
+			buffer_readjust();
+			return 1;
+		}
+		parse_result = parse_line(buffer);
 		++line_counter;
 		if (parse_result == 0) {
 //			fprintf(stdout, "%zu ", line_counter);
@@ -139,12 +144,19 @@ size_t read_line() {
 			int out_of_memory = buffer_enlarge();
 			if (out_of_memory)
 //				todo
-				return 0;
+				return SIZE_MAX;
 		}
 		buffer[ans - 1] = ' ';
 		buffer[ans] = '\0';
 		int c = getchar();
-		if (c == EOF) return 0;
+		if (c == EOF) {
+			if (ans == 1) {
+				return 0;
+			} else {
+				print_error();
+				return 0;
+			}
+		}
 		if (c == '\n') break;
 		buffer[ans - 1] = (char) c;
 	}
@@ -161,7 +173,7 @@ size_t second_arg_size(Command c, const char *str) {
 }
 
 int exec_two_arg(const char *str, Command c, size_t s1, size_t s2) {
-	assert(s1 && s2);
+	assert((s1 > 1) && (s2 > 1));
 	char arg1[s1], arg2[s2];
 	strncpy(arg1, str, s1 - 1);
 	strncpy(arg2, str + s1, s2 - 1);
@@ -229,7 +241,7 @@ int parse_line(const char *str) {
 	if (c == ERROR) return 1;
 	str += command_size(c);
 	arg1_size = history_size(str);
-	if (!arg1_size)
+	if (arg1_size < 2)
 		return 1;
 	arg2_size = second_arg_size(c, str + arg1_size);
 	if (str[arg1_size + arg2_size] != '\0') return 1;
@@ -246,9 +258,6 @@ int exec_one_arg(const char *str, Command c, size_t s) {
 	arg[s - 1] = '\0';
 	switch (c) {
 		case (DECLARE) : {
-			if (!strcmp(arg, "200")){
-			
-			}
 			tree_insert(root, arg);
 			return 0;
 		}

@@ -31,9 +31,11 @@ void energy_init_fields(Energy *e, energy_t val, size_t size) {
 }
 
 void clear_all(Energy *root) {
-	for (Energy *i = root; ; i = i->right) {
+	Energy *last = root->left;
+	for (Energy *i = root, *next; ; i = next) {
+		next = i->right;
 		free(i);
-		if (i == root->left)
+		if (i == last)
 			break;
 	}
 }

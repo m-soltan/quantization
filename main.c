@@ -2,7 +2,6 @@
 
 int main() {
 	initialize();
-	read_input();
-	return 0;
+	return read_input();
 }
 

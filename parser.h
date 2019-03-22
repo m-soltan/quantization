@@ -18,6 +18,6 @@ enum Command {
 };
 
 void initialize();
-void read_input();
+int read_input();
 
 #endif //QUANTIZATION_PARSER_H
