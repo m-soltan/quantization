@@ -116,7 +116,7 @@ int energy_print(Energy *x) {
 	if (!x) {
 		return 1;
 	} else {
-		fprintf(stdout, "%llu\n", energy_find(x)->val);
+		fprintf(stdout, "%" PRIu64 "\n", energy_find(x)->val);
 		return 0;
 	}
 }
