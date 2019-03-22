@@ -82,7 +82,7 @@ void add_energy(Node *x, energy_t e) {
 // auxiliary function definitions
 
 int empty(const char *str) {
-	return strnlen(str, 1) == 0;
+	return str[0] == '\0';
 }
 
 int init_fields(Node *x) {

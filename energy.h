@@ -2,6 +2,7 @@
 #define QUANTIZATION_ENERGY_H
 
 #include <assert.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
