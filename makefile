@@ -1,4 +1,4 @@
-CC = /usr/local/Cellar/gcc/8.3.0/bin/gcc-8
+CC = gcc
 FLAGS = -Wall -Wextra -std=c11
 
 # all: main
@@ -20,3 +20,6 @@ energy.o: energy.c energy.h
 
 main.o: main.c parser.h trie.h energy.h
 	$(CC) $(CFLAGS) -c $<
+
+clean:
+	rm -f *.gch *.o main
