@@ -121,7 +121,7 @@ size_t command_size(Command c) {
 size_t energy_length(const char *str) {
 	size_t ans;
 	for (ans = 0; str[ans] != ' '; ++ans)
-		if (!isnumber(str[ans]) || ans >= sizeof(MAX_ENERGY))
+		if (!isdigit(str[ans]) || ans >= sizeof(MAX_ENERGY))
 			return 0;
 	return ans + 1;
 }
