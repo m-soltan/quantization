@@ -19,6 +19,11 @@ static Node *root;
 static char static_buffer[BASE_BUFFER_SIZE];
 static char *buffer = static_buffer;
 
+// debug variables declarations
+
+int debug_alloc_fail = 0;
+size_t line_counter = 0;
+
 // auxiliary function declarations
 
 Command parse_command(const char *);
@@ -37,6 +42,37 @@ int exec_one_arg(const char *str, Command c, size_t s);
 int buffer_enlarge();
 void buffer_readjust();
 void print_error();
+void print_ok();
+
+// debug function declarations
+
+// used to check out of memory error handling
+void *debug_alloc(size_t size);
+
+// linked function definitions
+
+void initialize() {
+	root = tree_init();
+}
+
+void read_input() {
+	for (;;) {
+		int parse_result;
+		size_t length = read_line();
+		if (length == 0)
+			return;
+		if ((length == 1) || (static_buffer[0] == '#'))
+			continue;
+		parse_result = parse_line(static_buffer);
+		++line_counter;
+		if (parse_result == 0) {
+//			fprintf(stdout, "%zu ", line_counter);
+			print_ok();
+		}
+		if (parse_result == 1)
+			print_error();
+	}
+}
 
 // auxiliary function definitions
 
@@ -99,8 +135,12 @@ size_t read_line() {
 	buffer_readjust();
 	size_t ans;
 	for (ans = 1; ; ++ans) {
-		if (ans >= buffer_size)
-			buffer_enlarge();
+		if (ans >= buffer_size) {
+			int out_of_memory = buffer_enlarge();
+			if (out_of_memory)
+//				todo
+				return 0;
+		}
 		buffer[ans - 1] = ' ';
 		buffer[ans] = '\0';
 		int c = getchar();
@@ -171,6 +211,8 @@ int two_arg_equal(const char *arg1, const char *arg2) {
 	t2 = tree_find(root, arg2);
 	if (!t1 || !t2)
 		return 1;
+	if (!strcmp(arg1, arg2))
+		return 0;
 	e1 = get_energy(t1);
 	e2 = get_energy(t2);
 	assert(e1 && e2);
@@ -204,6 +246,9 @@ int exec_one_arg(const char *str, Command c, size_t s) {
 	arg[s - 1] = '\0';
 	switch (c) {
 		case (DECLARE) : {
+			if (!strcmp(arg, "200")){
+			
+			}
 			tree_insert(root, arg);
 			return 0;
 		}
@@ -214,9 +259,6 @@ int exec_one_arg(const char *str, Command c, size_t s) {
 			return 2;
 		}
 		case (REMOVE) : {
-			if (strlen(arg) > 9){
-				//todo: remove debug statement
-			}
 			tree_remove(root, arg);
 			return 0;
 		}
@@ -233,7 +275,7 @@ int buffer_enlarge() {
 	buffer_size *= 4;
 	if (buffer == static_buffer) {
 		static_buffer[BASE_BUFFER_SIZE - 1] = '\0';
-		buffer = malloc(sizeof(char) * buffer_size);
+		buffer = debug_alloc(sizeof(char) * buffer_size);
 		if (!buffer)
 			return 1;
 		strcpy(buffer, static_buffer);
@@ -260,24 +302,11 @@ void print_ok() {
 	fprintf(stdout, "OK\n");
 }
 
-// linked functions
+// debug function definitions
 
-void initialize() {
-	root = tree_init();
-}
-
-void read_input() {
-	for (;;) {
-		int parse_result;
-		size_t length = read_line();
-		if (length == 0)
-			return;
-		if ((length == 1) || (static_buffer[0] == '#'))
-			continue;
-		parse_result = parse_line(static_buffer);
-		if (parse_result == 0)
-			print_ok();
-		if (parse_result == 1)
-			print_error();
-	}
+void *debug_alloc(size_t size) {
+	if (debug_alloc_fail)
+		return NULL;
+	else
+		return malloc(size);
 }

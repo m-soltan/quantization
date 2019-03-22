@@ -41,6 +41,7 @@ int tree_insert(Node *tree, const char *str) {
 			if (!*next)
 				return 1;
 		}
+		(*next)->depth = 1 + tree->depth;
 		tree = *next;
 	}
 	return 0;
@@ -48,7 +49,7 @@ int tree_insert(Node *tree, const char *str) {
 
 int tree_remove(Node *tree, const char *str) {
 	Node *parent = find_parent(tree, str);
-	str += strlen(str) - 1;
+	str += parent->depth;
 	tree_destroy(get_child(parent, str[0]));
 	return 0;
 }
