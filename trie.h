@@ -14,7 +14,7 @@ int tree_destroy(Node **);
 int tree_insert(Node *, const char *);
 int tree_remove(Node *, const char *);
 Node *tree_find(Node *, const char *);
-Node *tree_init();
+Node *tree_init(void);
 void add_energy(Node *, energy_t);
 
 
