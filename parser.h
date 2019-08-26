@@ -7,16 +7,7 @@
 #include <string.h>
 #include "trie.h"
 
-enum Command {
-	DECLARE,
-	ENERGY,
-	ERROR,
-	EQUAL,
-	REMOVE,
-	VALID
-};
-
-void initialize();
-int read_input();
+void initialize(void);
+int read_input(void);
 
 #endif //QUANTIZATION_PARSER_H

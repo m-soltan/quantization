@@ -1,61 +1,64 @@
+#include <limits.h>
 #include "parser.h"
 
-// command literals
-#define CMD_DEC "DECLARE"
-#define CMD_ENE "ENERGY"
-#define CMD_EQU "EQUAL"
-#define CMD_REM "REMOVE"
-#define CMD_VAL "VALID"
 // maximum energy, the literal representing UINT64_MAX in decimal
 #define MAX_ENERGY "18446744073709551615"
-// maximum line length
-#define BASE_BUFFER_SIZE 140000
 
-typedef enum Command Command;
+// parser result codes
+#define PRINT_OK 0
+#define PRINT_ERROR 1
+#define PRINT_NOTHING 2
 
-static size_t buffer_size = BASE_BUFFER_SIZE;
+static size_t buffer_size = 16;
 static Node *root;
-static char static_buffer[BASE_BUFFER_SIZE];
-static char *buffer = static_buffer;
+static char *buffer;
 
 // debug variables declarations
+static int debug_alloc_fail = 0;
+static size_t line_counter = 0;
 
-int debug_alloc_fail = 0;
-size_t line_counter = 0;
 
-// auxiliary function declarations
+static const char *accept_energy(const char *str);
+static const char *accept_history(const char *str);
 
-Command parse_command(const char *);
-int command_match(const char *, const char *, size_t);
-int is_history_digit(char);
-size_t command_size(Command);
-size_t energy_length(const char *);
-size_t history_size(const char *);
-size_t read_line();
-size_t second_arg_size(Command c, const char *str);
-void init_where_null(Energy **e1, Energy **e2);
-int two_arg_energy(const char *, const char *);
-int two_arg_equal(const char *, const char *);
-int parse_line(const char *);
-int exec_one_arg(const char *str, Command c, size_t s);
-int buffer_enlarge();
-// switches back to the static buffer
-void buffer_readjust();
-void print_error();
-void print_ok();
+static energy_t scan_energy(void);
+static int do_declare(char *str);
+static int do_energy(char *str);
+static int do_equal(char *str);
+static int do_remove(char *str);
+static int do_valid(char *str);
+static int is_history_digit(char);
+static int is_declare(const char *str);
+static int is_energy(const char *str);
+static int is_equal(const char *str);
+static int is_remove(const char *str);
+static int is_valid(const char *str);
+static int read_end(const char *str);
+static int parse_line(char *);
+static int buffer_enlarge(void);
+static int buffer_init(void);
+static size_t read_line(void);
+static void print_error(void);
+static void print_ok(void);
+static void init_where_null(Energy **e1, Energy **e2);
 
-// debug function declarations
 
-// used to check out of memory error handling
-void *debug_alloc(size_t size);
 
-// linked function definitions
 
 void initialize() {
 	root = tree_init();
 }
 
 int read_input() {
+	// todo: remove
+	#undef stdin
+	stdin = fopen("./in.txt", "r");
+	assert(stdin);
+	{
+		int init_error = buffer_init();
+		if (init_error)
+			return init_error;
+	}
 	for (;;) {
 		int parse_result;
 		size_t length = read_line();
@@ -65,79 +68,39 @@ int read_input() {
 			continue;
 		if (length == SIZE_MAX) {
 			tree_destroy(&root);
-			buffer_readjust();
+			free(buffer);
 			return 1;
 		}
 		parse_result = parse_line(buffer);
 		++line_counter;
-		if (parse_result == 0) {
-//			fprintf(stdout, "%zu ", line_counter);
-			print_ok();
+		switch (parse_result) {
+			case (PRINT_NOTHING) : {
+				break;
+			}
+			case (PRINT_OK) : {
+				print_ok();
+				break;
+			}
+			case (PRINT_ERROR) : {
+				print_error();
+				break;
+			}
+			default: {
+				assert(0);
+				return -1;
+			}
 		}
-		if (parse_result == 1)
-			print_error();
 	}
 }
 
 // auxiliary function definitions
 
-Command parse_command(const char *str) {
-	if (command_match(str, CMD_DEC, sizeof(CMD_DEC))) return DECLARE;
-	if (command_match(str, CMD_ENE, sizeof(CMD_ENE))) return ENERGY;
-	if (command_match(str, CMD_EQU, sizeof(CMD_EQU))) return EQUAL;
-	if (command_match(str, CMD_REM, sizeof(CMD_REM))) return REMOVE;
-	if (command_match(str, CMD_VAL, sizeof(CMD_VAL))) return VALID;
-	return ERROR;
-}
-
-int command_match(const char *str, const char *cmd, size_t size) {
-	return !strncmp(str, cmd, size - 1);
-}
-
-int is_history_digit(char c) {
+static int is_history_digit(char c) {
 	return c >= '0' && c < '4';
 }
 
-// 0 - error
-size_t command_size(Command c) {
-	switch (c) {
-		case (DECLARE) :
-			return sizeof(CMD_DEC);
-		case (ENERGY) :
-			return sizeof(CMD_ENE);
-		case (EQUAL) :
-			return sizeof(CMD_EQU);
-		case (REMOVE) :
-			return sizeof(CMD_REM);
-		case (VALID) :
-			return sizeof(CMD_VAL);
-		default :
-			assert(0);
-	}
-	return 0;
-}
 
-// 0 - error
-size_t energy_length(const char *str) {
-	size_t ans;
-	for (ans = 0; str[ans] != ' '; ++ans)
-		if (!isdigit(str[ans]) || ans >= sizeof(MAX_ENERGY))
-			return 0;
-	return ans + 1;
-}
-
-// 0 - error
-size_t history_size(const char *str) {
-	size_t ans;
-	for (ans = 0; str[ans] != ' '; ++ans)
-		if (!is_history_digit(str[ans]))
-			return 0;
-	return ans + 1;
-}
-
-
-size_t read_line() {
-	buffer_readjust();
+static size_t read_line() {
 	size_t ans;
 	for (ans = 1; ; ++ans) {
 		if (ans >= buffer_size) {
@@ -146,9 +109,8 @@ size_t read_line() {
 //				todo
 				return SIZE_MAX;
 		}
-		buffer[ans - 1] = ' ';
-		buffer[ans] = '\0';
-		int c = getchar();
+		buffer[ans - 1] = '\0';
+		int c = fgetc(stdin);
 		if (c == EOF) {
 			if (ans == 1) {
 				return 0;
@@ -163,32 +125,7 @@ size_t read_line() {
 	return ans;
 }
 
-size_t second_arg_size(Command c, const char *str) {
-	size_t ans = 0;
-	if (c == EQUAL)
-		ans = history_size(str);
-	if (c == ENERGY)
-		ans = energy_length(str);
-	return ans;
-}
-
-int exec_two_arg(const char *str, Command c, size_t s1, size_t s2) {
-	assert((s1 > 1) && (s2 > 1));
-	char arg1[s1], arg2[s2];
-	strncpy(arg1, str, s1 - 1);
-	strncpy(arg2, str + s1, s2 - 1);
-	arg1[s1 - 1] = arg2[s2 - 1] = '\0';
-	switch (c) {
-		case (ENERGY) :
-			return two_arg_energy(arg1, arg2);
-		case (EQUAL) :
-			return two_arg_equal(arg1, arg2);
-		default:
-			return 1;
-	}
-}
-
-void init_where_null(Energy **e1, Energy **e2) {
+static void init_where_null(Energy **e1, Energy **e2) {
 	assert(*e1 || *e2);
 	if (*e1 && *e2)
 		return;
@@ -201,121 +138,195 @@ void init_where_null(Energy **e1, Energy **e2) {
 	}
 }
 
-int two_arg_energy(const char *arg1, const char *arg2) {
-	Node *t = tree_find(root, arg1);
-	if (!t) return 1;
-	if (!strcmp(arg2, MAX_ENERGY)) {
-		add_energy(t, energy_convert(UINT64_MAX));
+static int parse_line(char *str) {
+	if (is_declare(str)) {
+		return do_declare(str);
+	} else if (is_energy(str)) {
+		return do_energy(str);
+	} else if (is_equal(str)) {
+		return do_equal(str);
+	} else if (is_remove(str)) {
+		return do_remove(str);
+	} else if (is_valid(str)) {
+		return do_valid(str);
 	} else {
-		uint64_t a2 = strtoull(arg2, NULL, 10);
-		if (a2 != 0 && a2 < UINT64_MAX)
-			add_energy(t, energy_convert(a2));
-		else
-			return 1;
+		return 1;
 	}
-	return 0;
 }
 
-int two_arg_equal(const char *arg1, const char *arg2) {
-	Node *t1, *t2;
-	Energy **e1, **e2;
-	t1 = tree_find(root, arg1);
-	t2 = tree_find(root, arg2);
-	if (!t1 || !t2)
-		return 1;
-	if (!strcmp(arg1, arg2))
+static int buffer_enlarge() {
+	buffer_size *= 4;
+	char *temp;
+	temp = realloc(buffer, buffer_size);
+	if (temp) {
+		buffer = temp;
 		return 0;
-	e1 = get_energy(t1);
-	e2 = get_energy(t2);
-	assert(e1 && e2);
-	if (!*e1 && !*e2)
+	}
+	free(buffer);
+	return 1;
+}
+
+static void print_error() {
+	fprintf(stderr, "ERROR\n");
+}
+
+static void print_ok() {
+	fprintf(stdout, "OK\n");
+}
+
+static int is_declare(const char *str) {
+	const char *const command = "DECLARE ";
+	if (strncmp(str, command, strlen(command)) != 0)
+		return 0;
+	str += strlen(command);
+	str = accept_history(str);
+	return read_end(str);
+}
+
+static int is_energy(const char *str) {
+	const char *const command = "ENERGY ";
+	if (strncmp(str, command, strlen(command)) != 0)
+		return 0;
+	str += strlen(command);
+	str = accept_history(str);
+	if (read_end(str))
+		return 1;
+	if (str == NULL || str[0] != ' ')
+		return 0;
+	++str;
+	str = accept_energy(str);
+	return read_end(str);
+}
+
+static int is_equal(const char *str) {
+	const char *const command = "EQUAL ";
+	if (strncmp(str, command, strlen(command)) != 0)
+		return 0;
+	str += strlen(command);
+	str = accept_history(str);
+	if (str == NULL || str[0] != ' ')
+		return 0;
+	++str;
+	str = accept_history(str);
+	return read_end(str);
+}
+
+static const char *accept_history(const char *str) {
+	if (str == NULL)
+		return NULL;
+	while (is_history_digit(str[0]))
+		++str;
+	if (str[0] != '\0' && str[0] != ' ')
+		return NULL;
+	else
+		return str;
+}
+
+static int read_end(const char *str) {
+	return str && str[0] == '\0';
+}
+
+static int is_remove(const char *str) {
+	const char *const command = "REMOVE ";
+	if (strncmp(str, command, strlen(command)) != 0)
+		return 0;
+	str += strlen(command);
+	str = accept_history(str);
+	return read_end(str);
+}
+
+static const char *accept_energy(const char *str) {
+	if (strncmp(str, MAX_ENERGY, strlen(MAX_ENERGY)) == 0)
+		return str + strlen(MAX_ENERGY);
+	char *ans;
+	uint64_t value = strtoull(str, &ans, 10);
+	if (value < ULLONG_MAX)
+		return ans;
+	else
+		return NULL;
+}
+
+static int is_valid(const char *str) {
+	const char *const command = "VALID ";
+	if (strncmp(str, command, strlen(command)) != 0)
+		return 0;
+	str += strlen(command);
+	str = accept_history(str);
+	return read_end(str);
+}
+
+static int buffer_init(void) {
+	buffer = calloc(buffer_size, sizeof(char));
+	if (buffer)
+		return 0;
+	else
+		return 1;
+}
+
+static int do_declare(char *str) {
+	strtok(str, " ");
+	char *arg = strtok(NULL, " ");
+	int error = tree_insert(root, arg);
+	if (error == 0)
+		return PRINT_OK;
+	else
+		return PRINT_ERROR;
+}
+
+static energy_t scan_energy() {
+	return strtoull(strtok(NULL, " "), NULL, 10);
+}
+
+static int do_energy(char *str) {
+	strtok(str, " ");
+	char *arg1 = strtok(NULL, " ");
+	Node *t = tree_find(root, arg1);
+	if (str[0] != '\0') {
+		if (!t || energy_print(*get_energy(t)))
+			return PRINT_ERROR;
+		else
+			return PRINT_NOTHING;
+	} else {
+		energy_t arg2 = scan_energy();
+		add_energy(t, arg2);
+		return PRINT_OK;
+	}
+}
+
+static int do_equal(char *str) {
+	strtok(str, " ");
+	char *arg1 = strtok(NULL, " ");
+	char *arg2 = strtok(NULL, " ");
+	if (strcmp(arg1, arg2) == 0)
+		return 0;
+	Node *t1 = tree_find(root, arg1);
+	Node *t2 = tree_find(root, arg2);
+	if (t1 == NULL || t2 == NULL)
+		return 1;
+	Energy **e1 = get_energy(t1);
+	Energy **e2 = get_energy(t2);
+	if (e1[0] == NULL && e2[0] == NULL)
 		return 1;
 	init_where_null(e1, e2);
 	energy_union(*e1, *e2);
 	return 0;
 }
 
-int parse_line(const char *str) {
-	size_t arg1_size, arg2_size = 0;
-	Command c = parse_command(str);
-	if (c == ERROR) return 1;
-	str += command_size(c);
-	arg1_size = history_size(str);
-	if (arg1_size < 2)
-		return 1;
-	arg2_size = second_arg_size(c, str + arg1_size);
-	if (str[arg1_size + arg2_size] != '\0') return 1;
-	if (arg2_size)
-		return exec_two_arg(str, c, arg1_size, arg2_size);
-	else
-		return exec_one_arg(str, c, arg1_size);
-}
-
-int exec_one_arg(const char *str, Command c, size_t s) {
-	assert(s);
-	char arg[s];
-	strncpy(arg, str, s - 1);
-	arg[s - 1] = '\0';
-	switch (c) {
-		case (DECLARE) : {
-			tree_insert(root, arg);
-			return 0;
-		}
-		case (ENERGY) : {
-			Node *t = tree_find(root, arg);
-			if (!t || energy_print(*get_energy(t)))
-				return 1;
-			return 2;
-		}
-		case (REMOVE) : {
-			tree_remove(root, arg);
-			return 0;
-		}
-		case (VALID) : {
-			puts(tree_find(root, arg) ? "YES" : "NO");
-			return 2;
-		}
-		default:
-			return 1;
-	}
-}
-
-int buffer_enlarge() {
-	buffer_size *= 4;
-	if (buffer == static_buffer) {
-		static_buffer[BASE_BUFFER_SIZE - 1] = '\0';
-		buffer = debug_alloc(sizeof(char) * buffer_size);
-		if (!buffer)
-			return 1;
-		strcpy(buffer, static_buffer);
+int do_remove(char *str) {
+	strtok(str, " ");
+	char *arg1 = strtok(NULL, " ");
+	if (tree_find(root, arg1)) {
+		tree_remove(root, arg1);
+		return PRINT_OK;
 	} else {
-		buffer = realloc(buffer, buffer_size);
-		if (!buffer)
-			return 1;
+		return PRINT_ERROR;
 	}
-	return 0;
 }
 
-void buffer_readjust() {
-	if (buffer == static_buffer)
-		return;
-	free(buffer);
-	buffer = static_buffer;
+int do_valid(char *str) {
+	strtok(str, " ");
+	char *arg1 = strtok(NULL, " ");
+	puts(tree_find(root, arg1) ? "YES" : "NO");
+	return PRINT_NOTHING;
 }
 
-void print_error() {
-	fprintf(stderr, "ERROR\n");
-}
-
-void print_ok() {
-	fprintf(stdout, "OK\n");
-}
-
-// debug function definitions
-
-void *debug_alloc(size_t size) {
-	if (debug_alloc_fail)
-		return NULL;
-	else
-		return malloc(size);
-}
