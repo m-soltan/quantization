@@ -3,72 +3,19 @@
 struct Energy {
 	energy_t val;
 	int is_removed;
+	int pad;
 	size_t removed_count;
 	size_t size;
 	Energy *parent;
 	Energy *left, *right;
 };
 
-// Auxiliary functions
-
-energy_t avg(energy_t, energy_t);
-void energy_init_fields(Energy *e, energy_t val, size_t size);
-void energy_attach(Energy *, Energy *);
-void energy_join(Energy *e1, Energy *e2);
-
-energy_t avg(energy_t e1, energy_t e2) {
-	if (e1 > e2) return avg(e2, e1);
-	energy_t d = e2 - e1;
-	return e1 + d / 2;
-}
-
-void energy_init_fields(Energy *e, energy_t val, size_t size) {
-	e->val = val;
-	e->is_removed = 0;
-	e->removed_count = 0;
-	e->size = size;
-	e->parent = e->left = e->right = e;
-}
-
-void clear_all(Energy *root) {
-	Energy *last = root->left;
-	for (Energy *i = root, *next; ; i = next) {
-		next = i->right;
-		free(i);
-		if (i == last)
-			break;
-	}
-}
-
-void clear_removed(Energy *old_root) {
-	Energy *new_root = old_root;
-	old_root->size -= old_root->removed_count;
-	while (new_root->is_removed) new_root = new_root->right;
-	energy_init_fields(new_root, old_root->val, old_root->size);
-	Energy *prev = new_root;
-	for (Energy *i = new_root->right; ; i = i->right) {
-		if (i->is_removed) {
-			free(i);
-		} else {
-			i->parent = new_root;
-			i->left = prev;
-			prev->right = i;
-			prev = i;
-		}
-		if (i == new_root)
-			break;
-	}
-}
-
-void energy_attach(Energy *e1, Energy *e2) {
-	energy_join(e2->left, e1->right);
-	energy_join(e1, e2);
-}
-
-void energy_join(Energy *e1, Energy *e2) {
-	e1->right = e2;
-	e2->left = e1;
-}
+static energy_t avg(energy_t, energy_t);
+static void clear_all(Energy *root);
+static void clear_removed(Energy *old_root);
+static void energy_init_fields(Energy *e, energy_t val, size_t size);
+static void energy_attach(Energy *, Energy *);
+static void energy_join(Energy *e1, Energy *e2);
 
 // a Disjoint-Set implementation with path-splitting and union by size
 
@@ -90,7 +37,7 @@ energy_t energy_value(const Energy *x) {
 }
 
 Energy * energy_init(energy_t val) {
-	Energy *ans = (Energy *) malloc(sizeof(Energy));
+	Energy *ans = calloc(1, sizeof(Energy));
 	if (ans) {
 		ans->val = val;
 		ans->parent = ans;
@@ -151,3 +98,56 @@ void energy_destroy(Energy *x) {
 	}
 }
 
+static energy_t avg(energy_t e1, energy_t e2) {
+	if (e1 > e2) return avg(e2, e1);
+	energy_t d = e2 - e1;
+	return e1 + d / 2;
+}
+
+static void energy_init_fields(Energy *e, energy_t val, size_t size) {
+	e->val = val;
+	e->is_removed = 0;
+	e->removed_count = 0;
+	e->size = size;
+	e->parent = e->left = e->right = e;
+}
+
+static void energy_attach(Energy *e1, Energy *e2) {
+	energy_join(e2->left, e1->right);
+	energy_join(e1, e2);
+}
+
+static void energy_join(Energy *e1, Energy *e2) {
+	e1->right = e2;
+	e2->left = e1;
+}
+
+static void clear_removed(Energy *old_root) {
+	Energy *new_root = old_root;
+	old_root->size -= old_root->removed_count;
+	while (new_root->is_removed) new_root = new_root->right;
+	energy_init_fields(new_root, old_root->val, old_root->size);
+	Energy *prev = new_root;
+	for (Energy *i = new_root->right; ; i = i->right) {
+		if (i->is_removed) {
+			free(i);
+		} else {
+			i->parent = new_root;
+			i->left = prev;
+			prev->right = i;
+			prev = i;
+		}
+		if (i == new_root)
+			break;
+	}
+}
+
+static void clear_all(Energy *root) {
+	Energy *last = root->left;
+	for (Energy *i = root, *next; ; i = next) {
+		next = i->right;
+		free(i);
+		if (i == last)
+			break;
+	}
+}
