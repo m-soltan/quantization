@@ -1,5 +1,7 @@
 #include "energy.h"
 
+typedef struct Energy_list Energy_list;
+
 struct Energy {
 	energy_t val;
 	int is_removed;
@@ -10,12 +12,21 @@ struct Energy {
 	Energy *left, *right;
 };
 
+struct Energy_list {
+	Energy **v;
+	size_t length, max_length;
+};
+
+static Energy_list list;
+
 static energy_t avg(energy_t, energy_t);
+static int reserve(void);
 static void clear_all(Energy *root);
 static void clear_removed(Energy *old_root);
 static void energy_init_fields(Energy *e, energy_t val, size_t size);
 static void energy_attach(Energy *, Energy *);
 static void energy_join(Energy *e1, Energy *e2);
+static Energy *init(void);
 
 // a Disjoint-Set implementation with path-splitting and union by size
 
@@ -27,17 +38,13 @@ Energy * energy_find(Energy *x) {
 	return x;
 }
 
-energy_t energy_convert(uint64_t x) {
-	return x;
-}
-
 energy_t energy_value(const Energy *x) {
 	assert(x);
 	return x->val;
 }
 
-Energy * energy_init(energy_t val) {
-	Energy *ans = calloc(1, sizeof(Energy));
+Energy *energy_init(energy_t val) {
+	Energy *ans = init();
 	if (ans) {
 		ans->val = val;
 		ans->parent = ans;
@@ -49,13 +56,15 @@ Energy * energy_init(energy_t val) {
 	return ans;
 }
 
-Energy * energy_mod(Energy *old, energy_t new_val) {
+Energy *energy_mod(Energy *old, energy_t new_val) {
 	if (old) {
 		Energy *root = energy_find(old);
 		root->val = new_val;
 		return old;
 	} else {
-		return energy_init(new_val);
+		Energy *ans = energy_init(new_val);
+		assert(ans);
+		return ans;
 	}
 }
 
@@ -96,6 +105,25 @@ void energy_destroy(Energy *x) {
 		clear_removed(root);
 		return;
 	}
+}
+
+void energy_finish(void) {
+	for (size_t i = 0; i < list.length; ++i)
+		free(list.v[i]);
+	free(list.v);
+}
+
+int energy_start(void) {
+	const size_t init_max = 16;
+	list = (Energy_list) {
+		.v = calloc(init_max, sizeof(Energy)),
+		.length = 0,
+		.max_length = init_max
+	};
+	if (list.v)
+		return 0;
+	else
+		return -1;
 }
 
 static energy_t avg(energy_t e1, energy_t e2) {
@@ -150,4 +178,34 @@ static void clear_all(Energy *root) {
 		if (i == last)
 			break;
 	}
+}
+
+int reserve(void) {
+	if (list.length == list.max_length) {
+		const size_t new_max = 4 * list.max_length;
+		assert(new_max);
+		Energy **temp = realloc(list.v, new_max * sizeof(Energy));
+		if (temp) {
+			list.v = temp;
+			list.max_length = new_max;
+		} else {
+			assert(0); // todo
+			return -1;
+		}
+	}
+	return 0;
+}
+
+static Energy *init(void) {
+	int error = reserve();
+	if (error == 0) {
+		Energy *ans = calloc(1, sizeof(Energy));
+		if (ans) {
+			list.v[list.length] = ans;
+			++list.length;
+			return ans;
+		}
+	}
+	assert(0);
+	return NULL;
 }

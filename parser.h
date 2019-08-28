@@ -9,5 +9,6 @@
 
 void initialize(void);
 int read_input(void);
+void finish(void);
 
 #endif //QUANTIZATION_PARSER_H

@@ -24,8 +24,9 @@ static int list_empty(void);
 static Node *list_pop(void);
 static int list_push(Node *);
 static int destroy(Node **pNode);
-Node *find_parent(Node *, const char *);
-Node **get_child(Node *, char);
+static Node *find_parent(Node *, const char *);
+static Node **get_child(Node *, char);
+static Node *init(void);
 
 // linked function definitions
 
@@ -48,9 +49,9 @@ int tree_insert(Node *tree, const char *str) {
 	assert(str);
 	for (Node **next; !empty(str); ++str) {
 		next = get_child(tree, str[0]);
-		if (!*next) {
-			*next = tree_init();
-			if (!*next)
+		if (*next == NULL) {
+			*next = init();
+			if (*next == NULL)
 				return 1;
 		}
 		(*next)->depth = 1 + tree->depth;
@@ -62,7 +63,6 @@ int tree_insert(Node *tree, const char *str) {
 int tree_remove(Node *tree, const char *str) {
 	Node *parent = find_parent(tree, str);
 	assert(parent);
-	assert(parent != tree);
 	str += parent->depth;
 	tree_destroy(get_child(parent, str[0]));
 	return 0;
@@ -84,28 +84,36 @@ Node * tree_find(Node *tree, const char *str) {
 }
 
 Node *tree_init() {
+	assert(list.v == NULL);
 	list = (List) {
 		.v = calloc(start_length, sizeof(Node *)),
 		.max_length = start_length,
 		.length = 0
 	};
 	if (list.v) {
-		Node *ans = calloc(1, sizeof(Node));
-		if (ans) {
-			if (!init_fields(ans))
-				return ans;
-			free(ans);
-		}
+		Node *ans = init();
+		if (ans)
+			return ans;
 		free(list.v);
 	}
 	return NULL;
 }
 
-void add_energy(Node *x, energy_t e) {
-	x->energy = energy_mod(x->energy, e);
+int add_energy(Node *x, energy_t e) {
+	if (e == 0)
+		return 1;
+	Energy *energy = energy_mod(x->energy, e);
+	if (energy) {
+		x->energy = energy;
+		return 0;
+	} else {
+		return -1;
+	}
 }
 
-// auxiliary function definitions
+void tree_finish(void) {
+	free(list.v);
+}
 
 int empty(const char *str) {
 	return str[0] == '\0';
@@ -132,7 +140,7 @@ Node *find_parent(Node *tree, const char *str) {
 }
 
 Node **get_child(Node *parent, char c) {
-	assert(c >= '0' && c < '4');
+	assert(c >= '0' && c < '0' + DEGREE);
 	return &parent->children[c - '0'];
 }
 
@@ -161,17 +169,29 @@ int list_push(Node *node) {
 
 int destroy(Node **pNode) {
 	Node *node = *pNode;
+	Node **children = node->children;
 	*pNode = NULL;
-	energy_destroy(node->energy);
-	if (node->children == NULL)
+//	energy_destroy(node->energy);
+	free(node);
+	if (children == NULL)
 		return 0;
 	for (size_t i = 0; i < DEGREE; ++i) {
-		Node *child = node->children[i];
+		Node *child = children[i];
 		if (child) {
 			int error = list_push(child);
 			assert(error == 0);
 		}
 	}
-	free(node->children);
+	free(children);
 	return 0;
+}
+
+Node *init(void) {
+	Node *ans = calloc(1, sizeof(Node));
+	if (ans) {
+		if (!init_fields(ans))
+			return ans;
+		free(ans);
+	}
+	return NULL;
 }

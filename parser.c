@@ -10,18 +10,17 @@
 #define PRINT_NOTHING 2
 
 static size_t buffer_size = 16;
-static Node *root;
+static Node *root = NULL;
 static char *buffer;
 
 // debug variables declarations
-static int debug_alloc_fail = 0;
 static size_t line_counter = 0;
 
 
 static const char *accept_energy(const char *str);
 static const char *accept_history(const char *str);
 
-static energy_t scan_energy(void);
+static energy_t scan_energy(const char *str);
 static int do_declare(char *str);
 static int do_energy(char *str);
 static int do_equal(char *str);
@@ -46,14 +45,11 @@ static void init_where_null(Energy **e1, Energy **e2);
 
 
 void initialize() {
+	assert(root == NULL);
 	root = tree_init();
 }
 
 int read_input() {
-	// todo: remove
-	#undef stdin
-	stdin = fopen("./in.txt", "r");
-	assert(stdin);
 	{
 		int init_error = buffer_init();
 		if (init_error)
@@ -71,7 +67,10 @@ int read_input() {
 			free(buffer);
 			return 1;
 		}
-		parse_result = parse_line(buffer);
+		if (length - 1 == strnlen(buffer, buffer_size))
+			parse_result = parse_line(buffer);
+		else
+			parse_result = PRINT_ERROR;
 		++line_counter;
 		switch (parse_result) {
 			case (PRINT_NOTHING) : {
@@ -91,6 +90,13 @@ int read_input() {
 			}
 		}
 	}
+}
+
+void finish(void) {
+	int error = tree_destroy(&root);
+	free(buffer);
+	free(root);
+	assert(error == 0);
 }
 
 // auxiliary function definitions
@@ -150,7 +156,7 @@ static int parse_line(char *str) {
 	} else if (is_valid(str)) {
 		return do_valid(str);
 	} else {
-		return 1;
+		return PRINT_ERROR;
 	}
 }
 
@@ -239,6 +245,9 @@ static const char *accept_energy(const char *str) {
 	if (strncmp(str, MAX_ENERGY, strlen(MAX_ENERGY)) == 0)
 		return str + strlen(MAX_ENERGY);
 	char *ans;
+	// strtoull ignores leading spaces, but we want to fail on those
+	if (!isdigit(str[0]))
+		return NULL;
 	uint64_t value = strtoull(str, &ans, 10);
 	if (value < ULLONG_MAX)
 		return ans;
@@ -266,30 +275,44 @@ static int buffer_init(void) {
 static int do_declare(char *str) {
 	strtok(str, " ");
 	char *arg = strtok(NULL, " ");
-	int error = tree_insert(root, arg);
-	if (error == 0)
-		return PRINT_OK;
-	else
-		return PRINT_ERROR;
+	if (arg) {
+		int error = tree_insert(root, arg);
+		if (error == 0)
+			return PRINT_OK;
+	}
+	return PRINT_ERROR;
 }
 
-static energy_t scan_energy() {
-	return strtoull(strtok(NULL, " "), NULL, 10);
+static energy_t scan_energy(const char *str) {
+	return strtoull(str, NULL, 10);
 }
 
 static int do_energy(char *str) {
 	strtok(str, " ");
 	char *arg1 = strtok(NULL, " ");
 	Node *t = tree_find(root, arg1);
-	if (str[0] != '\0') {
+	char *arg2 = strtok(NULL, " ");
+	if (arg2) {
+		int error;
+		energy_t en = scan_energy(arg2);
+		if (!t)
+			return PRINT_ERROR;
+		error = add_energy(t, en);
+		switch (error) {
+			case (0) :
+				return PRINT_OK;
+			case (1) :
+				return PRINT_ERROR;
+			default: {
+				assert(0);
+				return -1;
+			}
+		}
+	} else {
 		if (!t || energy_print(*get_energy(t)))
 			return PRINT_ERROR;
 		else
 			return PRINT_NOTHING;
-	} else {
-		energy_t arg2 = scan_energy();
-		add_energy(t, arg2);
-		return PRINT_OK;
 	}
 }
 
@@ -297,19 +320,24 @@ static int do_equal(char *str) {
 	strtok(str, " ");
 	char *arg1 = strtok(NULL, " ");
 	char *arg2 = strtok(NULL, " ");
-	if (strcmp(arg1, arg2) == 0)
-		return 0;
 	Node *t1 = tree_find(root, arg1);
 	Node *t2 = tree_find(root, arg2);
+	if (strcmp(arg1, arg2) == 0) { // EQUAL with identical arguments
+		assert(t1 == t2);
+		if (t1) // return no error...
+			return PRINT_OK;
+		else // ...unless the history doesn't exist
+			return PRINT_ERROR;
+	}
 	if (t1 == NULL || t2 == NULL)
-		return 1;
+		return PRINT_ERROR;
 	Energy **e1 = get_energy(t1);
 	Energy **e2 = get_energy(t2);
 	if (e1[0] == NULL && e2[0] == NULL)
-		return 1;
+		return PRINT_ERROR;
 	init_where_null(e1, e2);
 	energy_union(*e1, *e2);
-	return 0;
+	return PRINT_OK;
 }
 
 int do_remove(char *str) {
@@ -319,14 +347,19 @@ int do_remove(char *str) {
 		tree_remove(root, arg1);
 		return PRINT_OK;
 	} else {
-		return PRINT_ERROR;
+		// removing a nonexistent history is valid
+		return PRINT_OK;
 	}
 }
 
 int do_valid(char *str) {
 	strtok(str, " ");
 	char *arg1 = strtok(NULL, " ");
-	puts(tree_find(root, arg1) ? "YES" : "NO");
-	return PRINT_NOTHING;
+	if (arg1) {
+		puts(tree_find(root, arg1) ? "YES" : "NO");
+		return PRINT_NOTHING;
+	} else {
+		return PRINT_ERROR;
+	}
 }
 
