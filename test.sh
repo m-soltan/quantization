@@ -8,7 +8,7 @@ testsOk=0
 for i in $(echo ${directory}/*.in)
 do
     fName=${i%%.in}
-    ./${program} <${fName}.in 1>${fName%%.in}.Xout 2>${fName%%.in}.Xerr
+    valgrind  -q --log-file="valgrind_report" --leak-check=full --show-leak-kinds=all  --errors-for-leak-kinds=all --error-exitcode=42 ./${program} <${fName}.in 1>${fName%%.in}.Xout 2>${fName%%.in}.Xerr
 
     if ! cmp ${fName}.out ${fName}.Xout >/dev/null
     then {
