@@ -7,7 +7,7 @@
 #include <string.h>
 #include "trie.h"
 
-void initialize(void);
+int initialize(void);
 int read_input(void);
 void finish(void);
 

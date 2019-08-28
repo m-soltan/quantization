@@ -36,11 +36,18 @@ Energy ** get_energy(Node *x) {
 
 int tree_destroy(Node **x) {
 	assert(x != NULL);
-	list_push(*x);
+	{
+		int error = list_push(*x);
+		if (error)
+			return error;
+	}
 	*x = NULL;
 	while (!list_empty()) {
+		int error;
 		Node *node = list_pop();
-		destroy(&node);
+		error = destroy(&node);
+		if (error)
+			return error;
 	}
 	return 0;
 }
@@ -52,7 +59,7 @@ int tree_insert(Node *tree, const char *str) {
 		if (*next == NULL) {
 			*next = init();
 			if (*next == NULL)
-				return 1;
+				return -1;
 		}
 		(*next)->depth = 1 + tree->depth;
 		tree = *next;
@@ -159,7 +166,7 @@ int list_push(Node *node) {
 		list.max_length *= 4;
 		Node **temp = realloc(list.v, list.max_length);
 		if (temp == NULL)
-			return 1;
+			return -1;
 	}
 	assert(list.max_length > list.length);
 	list.v[list.length] = node;
@@ -171,7 +178,6 @@ int destroy(Node **pNode) {
 	Node *node = *pNode;
 	Node **children = node->children;
 	*pNode = NULL;
-//	energy_destroy(node->energy);
 	free(node);
 	if (children == NULL)
 		return 0;
@@ -179,7 +185,8 @@ int destroy(Node **pNode) {
 		Node *child = children[i];
 		if (child) {
 			int error = list_push(child);
-			assert(error == 0);
+			if (error)
+				return error;
 		}
 	}
 	free(children);

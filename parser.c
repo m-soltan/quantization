@@ -1,4 +1,5 @@
 #include <limits.h>
+#include <string.h>
 #include "parser.h"
 
 // maximum energy, the literal representing UINT64_MAX in decimal
@@ -39,14 +40,17 @@ static int buffer_init(void);
 static size_t read_line(void);
 static void print_error(void);
 static void print_ok(void);
-static void init_where_null(Energy **e1, Energy **e2);
+
+static int find_or_init(Energy **pEnergy, const Energy *other);
 
 
-
-
-void initialize() {
+int initialize() {
 	assert(root == NULL);
 	root = tree_init();
+	if (root == NULL)
+		return -1;
+	else
+		return 0;
 }
 
 int read_input() {
@@ -67,7 +71,7 @@ int read_input() {
 			free(buffer);
 			return 1;
 		}
-		if (length - 1 == strnlen(buffer, buffer_size))
+		if (length - 1 == strlen(buffer))
 			parse_result = parse_line(buffer);
 		else
 			parse_result = PRINT_ERROR;
@@ -85,7 +89,6 @@ int read_input() {
 				break;
 			}
 			default: {
-				assert(0);
 				return -1;
 			}
 		}
@@ -93,18 +96,14 @@ int read_input() {
 }
 
 void finish(void) {
-	int error = tree_destroy(&root);
+	tree_destroy(&root);
 	free(buffer);
 	free(root);
-	assert(error == 0);
 }
-
-// auxiliary function definitions
 
 static int is_history_digit(char c) {
 	return c >= '0' && c < '4';
 }
-
 
 static size_t read_line() {
 	size_t ans;
@@ -112,7 +111,6 @@ static size_t read_line() {
 		if (ans >= buffer_size) {
 			int out_of_memory = buffer_enlarge();
 			if (out_of_memory)
-//				todo
 				return SIZE_MAX;
 		}
 		buffer[ans - 1] = '\0';
@@ -129,19 +127,6 @@ static size_t read_line() {
 		buffer[ans - 1] = (char) c;
 	}
 	return ans;
-}
-
-static void init_where_null(Energy **e1, Energy **e2) {
-	assert(*e1 || *e2);
-	if (*e1 && *e2)
-		return;
-	if (*e1) {
-		*e1 = energy_find(*e1);
-		*e2 = energy_init(energy_value(*e1));
-	} else {
-		*e2 = energy_find(*e2);
-		*e1 = energy_init(energy_value(*e2));
-	}
 }
 
 static int parse_line(char *str) {
@@ -304,7 +289,6 @@ static int do_energy(char *str) {
 			case (1) :
 				return PRINT_ERROR;
 			default: {
-				assert(0);
 				return -1;
 			}
 		}
@@ -317,6 +301,7 @@ static int do_energy(char *str) {
 }
 
 static int do_equal(char *str) {
+	int ans;
 	strtok(str, " ");
 	char *arg1 = strtok(NULL, " ");
 	char *arg2 = strtok(NULL, " ");
@@ -325,22 +310,30 @@ static int do_equal(char *str) {
 	if (strcmp(arg1, arg2) == 0) { // EQUAL with identical arguments
 		assert(t1 == t2);
 		if (t1) // return no error...
-			return PRINT_OK;
-		else // ...unless the history doesn't exist
+			ans = PRINT_OK;
+		else // ...except when the history doesn't exist
+			ans = PRINT_ERROR;
+	} else {
+		int error1, error2;
+		if (t1 == NULL || t2 == NULL)
 			return PRINT_ERROR;
+		Energy **e1 = get_energy(t1);
+		Energy **e2 = get_energy(t2);
+		if (*e1 == NULL && *e2 == NULL)
+			return PRINT_ERROR;
+		error1 = find_or_init(e1, *e2);
+		error2 = find_or_init(e2, *e1);
+		if (error1 == 0 && error2 == 0) {
+			energy_union(*e1, *e2);
+			ans = PRINT_OK;
+		} else {
+			ans = -1;
+		}
 	}
-	if (t1 == NULL || t2 == NULL)
-		return PRINT_ERROR;
-	Energy **e1 = get_energy(t1);
-	Energy **e2 = get_energy(t2);
-	if (e1[0] == NULL && e2[0] == NULL)
-		return PRINT_ERROR;
-	init_where_null(e1, e2);
-	energy_union(*e1, *e2);
-	return PRINT_OK;
+	return ans;
 }
 
-int do_remove(char *str) {
+static int do_remove(char *str) {
 	strtok(str, " ");
 	char *arg1 = strtok(NULL, " ");
 	if (tree_find(root, arg1)) {
@@ -352,7 +345,7 @@ int do_remove(char *str) {
 	}
 }
 
-int do_valid(char *str) {
+static int do_valid(char *str) {
 	strtok(str, " ");
 	char *arg1 = strtok(NULL, " ");
 	if (arg1) {
@@ -361,5 +354,17 @@ int do_valid(char *str) {
 	} else {
 		return PRINT_ERROR;
 	}
+}
+
+static int find_or_init(Energy **pEnergy, const Energy *other) {
+	Energy *energy = *pEnergy;
+	if (energy)
+		*pEnergy = energy_find(energy);
+	else
+		*pEnergy = energy_init(energy_value(other));
+	if (*pEnergy)
+		return 0;
+	else
+		return -1;
 }
 

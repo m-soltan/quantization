@@ -11,12 +11,11 @@ typedef uint64_t energy_t;
 typedef struct Energy Energy;
 
 uint64_t energy_value(const Energy *);
-Energy * energy_find(Energy *);
-Energy * energy_init(energy_t);
-Energy * energy_mod(Energy *, energy_t);
+Energy *energy_find(Energy *);
+Energy *energy_init(energy_t);
+Energy *energy_mod(Energy *, energy_t);
 int energy_print(Energy *);
 int energy_start(void);
-void energy_destroy(Energy *);
 void energy_finish(void);
 void energy_union(Energy *x, Energy *y);
 
