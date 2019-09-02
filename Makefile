@@ -1,5 +1,5 @@
 CC = gcc
-FLAGS = -Wall -Wextra -std=c11
+FLAGS = -Wall -Wextra -std=c11 -O2
 
 # all: main
 
